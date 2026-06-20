@@ -11,7 +11,7 @@ func TestScanSample(t *testing.T) {
 	for _, n := range g.Nodes {
 		has[n.ID] = true
 	}
-	for _, id := range []string{"source:user", "ext:api.stripe.com", "ext:api.segment.io", "sink:log", "store:db", "store:cache"} {
+	for _, id := range []string{"source:user", "ext:stripe", "ext:segment", "sink:log", "store:db", "store:cache"} {
 		if !has[id] {
 			t.Errorf("missing expected node %q", id)
 		}

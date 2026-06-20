@@ -2,6 +2,7 @@ package scan
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/judahpaul16/plume/internal/graph"
@@ -48,6 +49,29 @@ var knownVendors = map[string]string{
 	"mailchimp": "Mailchimp", "braintree": "Braintree", "paypal": "PayPal", "auth0": "Auth0",
 }
 
+// vendorTokens is knownVendors' keys in a stable order, so a callee or host that
+// contains more than one token resolves the same way every run.
+var vendorTokens = func() []string {
+	ts := make([]string, 0, len(knownVendors))
+	for t := range knownVendors {
+		ts = append(ts, t)
+	}
+	sort.Strings(ts)
+	return ts
+}()
+
+// matchVendor finds the first known vendor token contained in s (lowercased) and
+// returns its id token and friendly name. The same catalog canonicalizes both an
+// SDK callee and an HTTP host, so api.anthropic.com folds into the Anthropic node.
+func matchVendor(s string) (string, string, bool) {
+	for _, tok := range vendorTokens {
+		if strings.Contains(s, tok) {
+			return tok, knownVendors[tok], true
+		}
+	}
+	return "", "", false
+}
+
 func splitCallee(callee string) (recv, method string) {
 	callee = strings.TrimSpace(callee)
 	if i := strings.LastIndexAny(callee, ".:>"); i >= 0 {
@@ -62,16 +86,17 @@ func classifyCall(callee, text string) (target, bool) {
 	low := strings.ToLower(callee)
 	recv, method := splitCallee(low)
 
-	for tok, name := range knownVendors {
-		if strings.Contains(low, tok) {
-			return target{"ext:" + tok, name, graph.External, callee}, true
-		}
+	if tok, name, ok := matchVendor(low); ok {
+		return target{"ext:" + tok, name, graph.External, callee}, true
 	}
 	if commsRe.MatchString(low) {
 		return target{"ext:comms", "Email / messaging", graph.External, callee}, true
 	}
 	if (httpReceivers.MatchString(recv) && httpMethods.MatchString(method)) || method == "fetch" {
 		if m := urlRe.FindStringSubmatch(text); m != nil && !LooksLikePlaceholder(m[1]) {
+			if tok, name, ok := matchVendor(strings.ToLower(m[1])); ok {
+				return target{"ext:" + tok, name, graph.External, callee}, true
+			}
 			return target{"ext:" + m[1], m[1], graph.External, callee}, true
 		}
 		return target{"ext:http", "External HTTP", graph.External, callee}, true
