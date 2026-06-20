@@ -16,3 +16,73 @@ jobs:
       - run: go vet ./...
       - run: go build ./...
       - run: go test -race ./...
+
+  release:
+    needs: [test]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      github.event.head_commit.author.name != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - id: version
+        name: Compute the next version from commit markers
+        run: |
+          set -euo pipefail
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          ACCUM=${LATEST_TAG#v}
+          MAJOR=$(echo "$ACCUM" | cut -d. -f1)
+          MINOR=$(echo "$ACCUM" | cut -d. -f2)
+          PATCH=$(echo "$ACCUM" | cut -d. -f3)
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${LATEST_TAG}..HEAD"
+          fi
+          MESSAGES=$(git log "$RANGE" --pretty=format:"%s")
+          if echo "$MESSAGES" | grep -qi "\[major update\]"; then
+            MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+          elif echo "$MESSAGES" | grep -qi "\[minor update\]"; then
+            MINOR=$((MINOR + 1)); PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+          echo "version=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+          echo "previous=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+      - name: Build static binaries
+        env:
+          CGO_ENABLED: '0'
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            export GOOS=${target%/*} GOARCH=${target#*/}
+            ext=""; [ "$GOOS" = windows ] && ext=".exe"
+            go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" \
+              -o "dist/plume-${GOOS}-${GOARCH}${ext}" .
+          done
+      - name: Tag and create release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          PREV="${{ steps.version.outputs.previous }}"
+          if [ "$PREV" = "v0.0.0" ]; then
+            NOTES=$(git log HEAD --pretty=format:"- %h %s")
+          else
+            NOTES=$(git log "${PREV}..HEAD" --pretty=format:"- %h %s")
+          fi
+          git tag "$V"
+          git push origin "$V"
+          gh release create "$V" dist/* --title "$V" --notes "$NOTES"
