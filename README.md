@@ -82,7 +82,7 @@ The release binaries are fully static (`CGO_ENABLED=0`), one per OS/arch.
 
 ```
 plume [flags] [path ...]      scan paths (default: current dir) and open the graphic
-plume open <file>             reopen a saved report (.html, .svg, .png, .jpg)
+plume open <file|dir>         reopen a saved report, or pick from a folder of reports
 plume version                 print the version
 plume help                    print help
 

@@ -24,7 +24,7 @@ or a set of repos, and renders it as a readable graphic.
 
 usage:
   plume [flags] [path ...]   scan paths (default: current dir) and open a flow graphic
-  plume open <file>          serve and open a saved report (.html, .svg, .png)
+  plume open <file|dir>      open a saved report, or pick from a folder of reports
   plume version              print the version
   plume help                 print this help
 
@@ -109,11 +109,22 @@ func renderTo(out string, g *graph.Graph) ([]byte, error) {
 	}
 }
 
-// openReport serves and opens a saved report by its file type.
+// openReport serves and opens a saved report, or a picker gallery when given a
+// directory of reports.
 func openReport(args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: plume open <file>")
+		fmt.Fprintln(os.Stderr, "usage: plume open <file|dir>")
 		os.Exit(1)
+	}
+	info, err := os.Stat(args[0])
+	if err != nil {
+		fail(err)
+	}
+	if info.IsDir() {
+		if err := report.ServeDir(args[0]); err != nil {
+			fail(err)
+		}
+		return
 	}
 	data, err := os.ReadFile(args[0])
 	if err != nil {
