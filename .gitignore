@@ -1,0 +1,12 @@
+# binaries
+/plume
+/plume.exe
+dist/
+
+# generated reports
+/plume.html
+
+# go
+*.test
+*.out
+coverage*

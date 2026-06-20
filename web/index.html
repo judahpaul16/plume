@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Plume — user information flow</title>
+<style>
+  :root {
+    --bg: #0b0f17; --panel: #111826; --line: #1f2a3a; --ink: #e5edf7; --muted: #8aa0b8;
+    --source: #34d399; --service: #60a5fa; --store: #f59e0b; --sink: #9ca3af; --external: #f87171;
+    --pii: #f59e0b; --financial: #ef4444; --health: #a855f7; --credential: #ec4899; --special: #a855f7; --public: #64748b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  #app { display: flex; flex-direction: column; height: 100%; }
+  header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line);
+    background: var(--panel); flex-wrap: wrap; }
+  header .brand { font-weight: 700; letter-spacing: .3px; }
+  header .brand span { color: var(--source); }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .grow { flex: 1; }
+  input[type=search] { background: #0c1320; border: 1px solid var(--line); color: var(--ink);
+    border-radius: 8px; padding: 7px 10px; width: 220px; outline: none; }
+  input[type=search]:focus { border-color: var(--service); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 999px;
+    border: 1px solid var(--line); background: #0c1320; color: var(--muted); cursor: pointer; user-select: none; font-size: 12px; }
+  .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .chip.on { color: var(--ink); border-color: #34507a; }
+  .chip.off { opacity: .45; }
+  .toggle { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .toggle button { background: #0c1320; color: var(--muted); border: 0; padding: 7px 12px; cursor: pointer; font: inherit; }
+  .toggle button.on { background: #16223a; color: var(--ink); }
+  main { position: relative; flex: 1; overflow: hidden; }
+  svg { width: 100%; height: 100%; display: block; cursor: grab; }
+  svg.dragging { cursor: grabbing; }
+  .node rect { rx: 9; stroke-width: 1.5; }
+  .node text { fill: var(--ink); font-size: 12.5px; pointer-events: none; }
+  .node .meta { fill: var(--muted); font-size: 10.5px; }
+  .edge path { fill: none; stroke-width: 1.6; }
+  .edge text { fill: var(--muted); font-size: 10px; pointer-events: none; }
+  .faded { opacity: .12; transition: opacity .15s; }
+  .hit { opacity: 1; transition: opacity .15s; }
+  #tip { position: absolute; pointer-events: none; background: #0c1320ee; border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; font-size: 12px; max-width: 320px; color: var(--ink);
+    box-shadow: 0 8px 30px #0008; display: none; z-index: 5; }
+  #tip b { color: #fff; }
+  #tip .k { color: var(--muted); }
+  #legend { position: absolute; left: 12px; bottom: 12px; background: #0c1320cc; border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; font-size: 12px; color: var(--muted); }
+  #legend .row { display: flex; align-items: center; gap: 7px; margin: 3px 0; }
+  #legend .sw { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid; }
+  #empty { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: var(--muted); }
+  .hint { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">Plume<span>.</span></div>
+    <div class="sub" id="counts"></div>
+    <input type="search" id="search" placeholder="Search nodes…" autocomplete="off" />
+    <div class="chips" id="filters"></div>
+    <div class="grow"></div>
+    <div class="toggle">
+      <button id="vGraph" class="on">Graph</button>
+      <button id="vSankey">Sankey</button>
+    </div>
+    <button class="chip" id="fit">Fit</button>
+  </header>
+  <main>
+    <svg id="svg"><g id="root"></g></svg>
+    <div id="tip"></div>
+    <div id="legend"></div>
+    <div id="empty">No personal-data flows matched. Loosen the filters.</div>
+  </main>
+</div>
+<script>/*__PLUME_ELK__*/</script>
+<script>window.PLUME_DATA = /*__PLUME_DATA__*/;</script>
+<script>/*__PLUME_VIEWER__*/</script>
+</body>
+</html>
