@@ -15,27 +15,29 @@ self-contained interactive view in your browser.
 
 ## What you get
 
-A graph from **User → your services → stores / logs / third parties**, where each
-edge is tagged with the data categories it carries (email, name, card, SSN, …)
-and colored by sensitivity. A flow that carries a sensitive category into a log
-sink or a third party is exactly what a privacy review looks for.
+A graph from User to your services to stores / logs / third parties, where each
+edge is tagged with the data categories it carries (email, name, card, SSN) and
+colored by sensitivity. A flow that carries a sensitive category into a log sink
+or a third party is exactly what a privacy review looks for.
 
 The viewer is interactive (served on a loopback port so it works everywhere):
 
-- **Focus mode** — click a node to highlight its full upstream and downstream
+- **Focus mode**: click a node to highlight its full upstream and downstream
   lineage and fade the rest.
+- **Drag nodes** to rearrange; edges follow. **Export SVG** saves the current
+  layout as an image.
 - **Filter** by sensitivity, **search** nodes, pan and zoom.
 - A **Sankey** toggle for flow volume.
 
 ## What it detects
 
-- **Sources** — the user, the origin of personal data.
-- **Services** — your code files that handle it.
-- **Stores** — database / ORM / cache / object-store / queue writes.
-- **Sinks** — logger and stdout writes.
-- **External** — HTTP calls to non-local hosts, known SDKs (Stripe, Twilio,
-  Segment, Sentry, …), and email / messaging sends.
-- **Categories** — a built-in dictionary recognizes personal data by identifier
+- **Sources**: the user, the origin of personal data.
+- **Services**: your code files that handle it.
+- **Stores**: database, ORM, cache, object-store, and queue writes.
+- **Sinks**: logger and stdout writes.
+- **External**: HTTP calls to non-local hosts, known SDKs (Stripe, Twilio,
+  Segment, Sentry), and email / messaging sends.
+- **Categories**: a built-in dictionary recognizes personal data by identifier
   name and assigns a sensitivity (PII, financial, credential, health, special).
 
 Infrastructure-as-code (Terraform/HCL, compose, Kubernetes, Serverless) is a
@@ -44,7 +46,7 @@ first-class input: declared resources refine the generic stores, so a code-level
 
 ## How it works
 
-`collectors → normalized flow graph → renderer`. Files are detected and parsed
+`collectors -> normalized flow graph -> renderer`. Files are detected and parsed
 with an embedded, pure-Go tree-sitter runtime that covers 200+ languages, in
 parallel across cores. Extraction is zero-config static heuristics plus a personal
 -data dictionary: it surfaces candidate flows and filters obvious placeholder
@@ -64,14 +66,21 @@ git clone https://github.com/judahpaul16/plume && cd plume && go build -o plume 
 
 The release binaries are fully static (`CGO_ENABLED=0`), one per OS/arch.
 
-## Flags
+## Usage
 
 ```
-plume [flags] [path ...]
+plume [flags] [path ...]      scan paths (default: current dir) and open the graphic
+plume open <file.html>        reopen a saved report (serve + open, no http.server needed)
+
   --out FILE    output HTML file (default plume.html)
-  --no-open     write the report but do not serve or open a browser
+  --no-open     write the report but do not serve or open
+  --blackbox    collapse code files into one Application node and hide file paths
   --json        print the flow graph as JSON and exit
 ```
+
+`--blackbox` is for sharing externally: it merges every code file into a single
+"Application" node and drops file:line evidence, so the picture shows User to
+Application to stores / sinks / third parties without exposing internals.
 
 ## License
 

@@ -187,3 +187,36 @@ func (g *Graph) Finalize() {
 	})
 	sort.Slice(g.Categories, func(i, j int) bool { return g.Categories[i].ID < g.Categories[j].ID })
 }
+
+// Collapse merges every node of the given kind into one node, rewriting flows
+// through it and dropping per-flow evidence. Blackbox mode uses it to hide code
+// internals behind a single Application node.
+func Collapse(src *Graph, kind Kind, id, label string) *Graph {
+	isKind := map[string]bool{}
+	for _, n := range src.Nodes {
+		if n.Kind == kind {
+			isKind[n.ID] = true
+		}
+	}
+	mapID := func(nid string) string {
+		if isKind[nid] {
+			return id
+		}
+		return nid
+	}
+	g := New()
+	g.AddNode(Node{ID: id, Kind: kind, Label: label})
+	for _, n := range src.Nodes {
+		if !isKind[n.ID] {
+			g.AddNode(n)
+		}
+	}
+	for _, c := range src.Categories {
+		g.AddCategory(c)
+	}
+	for _, f := range src.Flows {
+		g.AddFlow(Flow{From: mapID(f.From), To: mapID(f.To), Categories: f.Categories})
+	}
+	g.Finalize()
+	return g
+}

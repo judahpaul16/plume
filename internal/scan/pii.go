@@ -31,13 +31,13 @@ var strong = map[string]PIICategory{
 	"apikey": {"credential", "Credential", graph.Credential}, "accesstoken": {"credential", "Credential", graph.Credential},
 	"refreshtoken": {"credential", "Credential", graph.Credential}, "privatekey": {"credential", "Credential", graph.Credential},
 	"clientsecret": {"credential", "Credential", graph.Credential},
-	"card":         {"card", "Card details", graph.Financial}, "creditcard": {"card", "Card details", graph.Financial},
+	"creditcard":   {"card", "Card details", graph.Financial}, "debitcard": {"card", "Card details", graph.Financial},
 	"cardnumber": {"card", "Card details", graph.Financial}, "ccn": {"card", "Card details", graph.Financial},
 	"cvv": {"card", "Card details", graph.Financial}, "cvc": {"card", "Card details", graph.Financial},
 	"iban": {"bank", "Bank account", graph.Financial}, "accountnumber": {"bank", "Bank account", graph.Financial},
 	"routing": {"bank", "Bank account", graph.Financial}, "sortcode": {"bank", "Bank account", graph.Financial},
 	"latitude": {"geo", "Location", graph.PII}, "longitude": {"geo", "Location", graph.PII},
-	"geolocation": {"geo", "Location", graph.PII}, "coordinates": {"geo", "Location", graph.PII},
+	"geolocation": {"geo", "Location", graph.PII}, "gps": {"geo", "Location", graph.PII},
 	"ipaddress": {"device", "Device / IP", graph.PII}, "useragent": {"device", "Device / IP", graph.PII},
 	"deviceid":  {"device", "Device / IP", graph.PII},
 	"diagnosis": {"health", "Health", graph.Health}, "medical": {"health", "Health", graph.Health},
@@ -48,6 +48,9 @@ var strong = map[string]PIICategory{
 	"firstname": {"name", "Name", graph.PII}, "lastname": {"name", "Name", graph.PII},
 	"fullname": {"name", "Name", graph.PII}, "surname": {"name", "Name", graph.PII},
 	"givenname": {"name", "Name", graph.PII}, "familyname": {"name", "Name", graph.PII},
+	"streetaddress": {"address", "Address", graph.PII}, "homeaddress": {"address", "Address", graph.PII},
+	"billingaddress": {"address", "Address", graph.PII}, "shippingaddress": {"address", "Address", graph.PII},
+	"mailingaddress": {"address", "Address", graph.PII}, "postaladdress": {"address", "Address", graph.PII},
 }
 
 // weakName tokens classify as a name only next to one of these qualifiers,
@@ -55,6 +58,11 @@ var strong = map[string]PIICategory{
 var nameQualifiers = map[string]bool{
 	"first": true, "last": true, "full": true, "given": true, "family": true,
 	"user": true, "customer": true, "contact": true, "display": true, "legal": true,
+}
+
+var addressQualifiers = map[string]bool{
+	"street": true, "home": true, "billing": true, "shipping": true,
+	"mailing": true, "postal": true, "residential": true, "delivery": true,
 }
 
 var camel = regexp.MustCompile(`([a-z0-9])([A-Z])`)
@@ -91,7 +99,7 @@ func Classify(id string) (PIICategory, bool) {
 				return PIICategory{"name", "Name", graph.PII}, true
 			}
 		}
-		if t == "address" {
+		if t == "address" && ((i > 0 && addressQualifiers[tk[i-1]]) || (i+1 < len(tk) && addressQualifiers[tk[i+1]])) {
 			return PIICategory{"address", "Address", graph.PII}, true
 		}
 	}

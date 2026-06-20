@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/judahpaul16/plume/internal/graph"
 	"github.com/judahpaul16/plume/internal/report"
 	"github.com/judahpaul16/plume/internal/scan"
 )
@@ -20,12 +21,35 @@ func main() {
 	out := flag.String("out", "plume.html", "output HTML file")
 	noOpen := flag.Bool("no-open", false, "write the report but do not serve or open a browser")
 	asJSON := flag.Bool("json", false, "print the flow graph as JSON and exit")
+	blackbox := flag.Bool("blackbox", false, "collapse code files into one Application node and hide file paths")
 	flag.Usage = func() {
-		fmt.Fprint(os.Stderr, "usage: plume [flags] [path ...]\n\nScans the given paths (default: current dir) and opens a flow graphic.\n\nflags:\n")
+		fmt.Fprint(os.Stderr, "usage:\n"+
+			"  plume [flags] [path ...]   scan paths (default: current dir) and open a flow graphic\n"+
+			"  plume open <file.html>     serve and open a previously generated report\n\nflags:\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	roots := flag.Args()
+	args := flag.Args()
+
+	// `plume open <file.html>` reopens a saved report without a separate server.
+	if len(args) >= 1 && args[0] == "open" {
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: plume open <file.html>")
+			os.Exit(1)
+		}
+		html, err := os.ReadFile(args[1])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "plume:", err)
+			os.Exit(1)
+		}
+		if err := report.Serve(html); err != nil {
+			fmt.Fprintln(os.Stderr, "plume:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	roots := args
 	if len(roots) == 0 {
 		roots = []string{"."}
 	}
@@ -33,6 +57,10 @@ func main() {
 	g, st := scan.Scan(roots)
 	fmt.Fprintf(os.Stderr, "plume: %d files scanned (%d parsed, %d infra) across %d languages; %d nodes, %d flows\n",
 		st.Files, st.Parsed, st.Infra, len(st.Languages), len(g.Nodes), len(g.Flows))
+
+	if *blackbox {
+		g = graph.Collapse(g, graph.Service, "svc:app", "Application")
+	}
 
 	if *asJSON {
 		enc := json.NewEncoder(os.Stdout)
