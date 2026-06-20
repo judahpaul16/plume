@@ -99,7 +99,7 @@
     flows.forEach(function (f) {
       if (!positions[f.from] || !positions[f.to]) return;
       var grp = el("g", { "class": "edge", "data-from": f.from, "data-to": f.to });
-      var path = el("path", { stroke: css("--" + flowSens(f)), "marker-end": "url(#arrow)" });
+      var path = el("path", { fill: "none", stroke: css("--" + flowSens(f)), "stroke-width": 1.6, "marker-end": "url(#arrow)" });
       grp.appendChild(path);
       var labels = catLabels(f), lbl = null;
       if (labels.length) { lbl = el("text", { "text-anchor": "middle" }); lbl.textContent = labels.join(", "); grp.appendChild(lbl); }
@@ -264,7 +264,7 @@
     clone.setAttribute("viewBox", (bb.x - pad) + " " + (bb.y - pad) + " " + w + " " + h);
     var rc = clone.querySelector("#root"); if (rc) rc.removeAttribute("transform");
     var style = el("style");
-    style.textContent = ".node text{fill:#e5edf7;font:12.5px sans-serif}.node .meta{fill:#8aa0b8;font-size:10.5px}.edge text{fill:#8aa0b8;font-size:10px}.faded{opacity:.12}";
+    style.textContent = ".node text{fill:#e5edf7;font:12.5px sans-serif}.node .meta{fill:#8aa0b8;font-size:10.5px}.edge path{fill:none}.edge text{fill:#8aa0b8;font-size:10px}.faded{opacity:.12}";
     clone.insertBefore(style, clone.firstChild);
     if (rc) rc.insertBefore(el("rect", { x: bb.x - pad, y: bb.y - pad, width: w, height: h, fill: "#0b0f17" }), rc.firstChild);
     return { svg: new XMLSerializer().serializeToString(clone), w: w, h: h };
