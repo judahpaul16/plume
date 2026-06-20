@@ -1,5 +1,3 @@
-// Plume maps how user information flows through a codebase, its infrastructure,
-// or a set of repos, and renders it as a readable interactive graphic.
 package main
 
 import (
@@ -8,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/judahpaul16/plume/internal/graph"
 	"github.com/judahpaul16/plume/internal/report"
@@ -17,39 +16,48 @@ import (
 //go:embed web
 var webFS embed.FS
 
+// version is overwritten at release build time via -ldflags "-X main.version=vX.Y.Z".
+var version = "dev"
+
+const usageText = `Plume maps how user information flows through a codebase, its infrastructure,
+or a set of repos, and renders it as a readable graphic.
+
+usage:
+  plume [flags] [path ...]   scan paths (default: current dir) and open a flow graphic
+  plume open <file>          serve and open a saved report (.html, .svg, .png)
+  plume version              print the version
+  plume help                 print this help
+
+flags:
+  --out FILE     output file; .html is interactive, .svg is a static image (default plume.html)
+  --no-open      write the report but do not serve or open a browser
+  --blackbox     collapse code files into one Application node and hide file paths
+  --json         print the flow graph as JSON and exit
+`
+
 func main() {
-	out := flag.String("out", "plume.html", "output HTML file")
+	if len(os.Args) >= 2 {
+		switch os.Args[1] {
+		case "version", "--version", "-v":
+			fmt.Println("plume " + version)
+			return
+		case "help", "--help", "-h":
+			fmt.Print(usageText)
+			return
+		case "open":
+			openReport(os.Args[2:])
+			return
+		}
+	}
+
+	out := flag.String("out", "plume.html", "output file (.html or .svg)")
 	noOpen := flag.Bool("no-open", false, "write the report but do not serve or open a browser")
 	asJSON := flag.Bool("json", false, "print the flow graph as JSON and exit")
 	blackbox := flag.Bool("blackbox", false, "collapse code files into one Application node and hide file paths")
-	flag.Usage = func() {
-		fmt.Fprint(os.Stderr, "usage:\n"+
-			"  plume [flags] [path ...]   scan paths (default: current dir) and open a flow graphic\n"+
-			"  plume open <file.html>     serve and open a previously generated report\n\nflags:\n")
-		flag.PrintDefaults()
-	}
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usageText) }
 	flag.Parse()
-	args := flag.Args()
 
-	// `plume open <file.html>` reopens a saved report without a separate server.
-	if len(args) >= 1 && args[0] == "open" {
-		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "usage: plume open <file.html>")
-			os.Exit(1)
-		}
-		html, err := os.ReadFile(args[1])
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "plume:", err)
-			os.Exit(1)
-		}
-		if err := report.Serve(html); err != nil {
-			fmt.Fprintln(os.Stderr, "plume:", err)
-			os.Exit(1)
-		}
-		return
-	}
-
-	roots := args
+	roots := flag.Args()
 	if len(roots) == 0 {
 		roots = []string{"."}
 	}
@@ -69,21 +77,54 @@ func main() {
 		return
 	}
 
-	html, err := report.Render(webFS, g)
+	data, err := renderTo(*out, g)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "plume:", err)
-		os.Exit(1)
+		fail(err)
 	}
-	if err := os.WriteFile(*out, html, 0o644); err != nil {
-		fmt.Fprintln(os.Stderr, "plume:", err)
-		os.Exit(1)
+	if err := os.WriteFile(*out, data, 0o644); err != nil {
+		fail(err)
 	}
-	fmt.Fprintf(os.Stderr, "plume: wrote %s (%d KB)\n", *out, len(html)/1024)
+	fmt.Fprintf(os.Stderr, "plume: wrote %s (%d KB)\n", *out, len(data)/1024)
 	if *noOpen {
 		return
 	}
-	if err := report.Serve(html); err != nil {
-		fmt.Fprintln(os.Stderr, "plume:", err)
+	if err := report.ServeContent(data, report.ContentType(*out)); err != nil {
+		fail(err)
+	}
+}
+
+// renderTo renders an interactive HTML page, or a static image (.svg, .png,
+// .jpg) when the output name carries an image extension.
+func renderTo(out string, g *graph.Graph) ([]byte, error) {
+	lo := strings.ToLower(out)
+	switch {
+	case strings.HasSuffix(lo, ".svg"):
+		return report.RenderSVG(g), nil
+	case strings.HasSuffix(lo, ".png"):
+		return report.RenderRaster(g, "png")
+	case strings.HasSuffix(lo, ".jpg"), strings.HasSuffix(lo, ".jpeg"):
+		return report.RenderRaster(g, "jpg")
+	default:
+		return report.Render(webFS, g)
+	}
+}
+
+// openReport serves and opens a saved report by its file type.
+func openReport(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: plume open <file>")
 		os.Exit(1)
 	}
+	data, err := os.ReadFile(args[0])
+	if err != nil {
+		fail(err)
+	}
+	if err := report.ServeContent(data, report.ContentType(args[0])); err != nil {
+		fail(err)
+	}
+}
+
+func fail(err error) {
+	fmt.Fprintln(os.Stderr, "plume:", err)
+	os.Exit(1)
 }

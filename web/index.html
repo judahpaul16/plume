@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Plume — user information flow</title>
+<title>Plume: user information flow</title>
 <style>
   :root {
     --bg: #0b0f17; --panel: #111826; --line: #1f2a3a; --ink: #e5edf7; --muted: #8aa0b8;
@@ -68,7 +68,12 @@
       <button id="vSankey">Sankey</button>
     </div>
     <button class="chip" id="fit">Fit</button>
-    <button class="chip" id="export">Export SVG</button>
+    <span class="hint">Export</span>
+    <div class="toggle">
+      <button id="exportPng">PNG</button>
+      <button id="exportSvg">SVG</button>
+      <button id="exportJpg">JPG</button>
+    </div>
   </header>
   <main>
     <svg id="svg"><g id="root"></g></svg>

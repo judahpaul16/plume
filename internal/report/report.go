@@ -43,7 +43,11 @@ func Render(webFS fs.FS, g *graph.Graph) ([]byte, error) {
 
 // Serve hosts the HTML on a loopback port, opens the browser, and blocks. It
 // serves over http (not file://) so the viewer's layout worker runs everywhere.
-func Serve(html []byte) error {
+func Serve(html []byte) error { return ServeContent(html, "text/html; charset=utf-8") }
+
+// ServeContent hosts arbitrary content on a loopback port, opens the browser,
+// and blocks. SVG and PNG reports use it to display directly in the browser.
+func ServeContent(data []byte, contentType string) error {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return err
@@ -51,12 +55,27 @@ func Serve(html []byte) error {
 	url := "http://" + ln.Addr().String() + "/"
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write(html)
+		w.Header().Set("Content-Type", contentType)
+		_, _ = w.Write(data)
 	})
 	go openBrowser(url)
 	fmt.Printf("Plume is viewing at %s  (press Ctrl+C to stop)\n", url)
 	return http.Serve(ln, mux)
+}
+
+// ContentType maps a report file extension to its MIME type for serving.
+func ContentType(path string) string {
+	p := strings.ToLower(path)
+	switch {
+	case strings.HasSuffix(p, ".svg"):
+		return "image/svg+xml"
+	case strings.HasSuffix(p, ".png"):
+		return "image/png"
+	case strings.HasSuffix(p, ".jpg"), strings.HasSuffix(p, ".jpeg"):
+		return "image/jpeg"
+	default:
+		return "text/html; charset=utf-8"
+	}
 }
 
 func openBrowser(url string) {
