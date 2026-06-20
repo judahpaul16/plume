@@ -56,10 +56,14 @@ func RenderRaster(g *graph.Graph, format string) ([]byte, error) {
 	dc.SetFontFace(elabel)
 	dc.SetHexColor("#8aa0b8")
 	for _, e := range d.Edges {
-		if e.Label == "" {
+		n := len(e.Lines)
+		if n == 0 {
 			continue
 		}
-		dc.DrawStringAnchored(e.Label, (e.X1+e.X2)/2, (e.Y1+e.Y2)/2-5, 0.5, 0.5)
+		for i, line := range e.Lines {
+			y := e.LabelY + (float64(i)-float64(n-1)/2)*edgeLineH
+			dc.DrawStringAnchored(line, e.LabelX, y, 0.5, 0.5)
+		}
 	}
 
 	for _, n := range d.Nodes {

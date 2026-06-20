@@ -53,6 +53,9 @@ const (
 	rowGap     = 26.0
 	contentTop = 64.0
 	legendH    = 36.0
+
+	labelMaxChars = 20
+	edgeLineH     = 11.0
 )
 
 type placedNode struct {
@@ -62,7 +65,9 @@ type placedNode struct {
 }
 
 type placedEdge struct {
-	From, To, Color, Label   string
+	From, To, Color          string
+	Lines                    []string
+	LabelX, LabelY           float64
 	X1, Y1, C1x, C2x, X2, Y2 float64
 }
 
@@ -193,7 +198,7 @@ func layout(g *graph.Graph) diagram {
 			continue
 		}
 		dx := math.Max(40, math.Abs(t.x-a.x)*0.35)
-		e := placedEdge{From: f.From, To: f.To, Label: edgeLabel(f, labelOf), Y1: a.y + nodeH/2, Y2: t.y + nodeH/2, Color: edgeColor(f, sevOf)}
+		e := placedEdge{From: f.From, To: f.To, Lines: wrapLabel(edgeLabel(f, labelOf), labelMaxChars), Y1: a.y + nodeH/2, Y2: t.y + nodeH/2, Color: edgeColor(f, sevOf)}
 		if t.x < a.x {
 			e.X1, e.C1x = a.x, a.x-dx
 			e.X2, e.C2x = t.x+nodeW, t.x+nodeW+dx
@@ -201,6 +206,8 @@ func layout(g *graph.Graph) diagram {
 			e.X1, e.C1x = a.x+nodeW, a.x+nodeW+dx
 			e.X2, e.C2x = t.x, t.x-dx
 		}
+		e.LabelX = (e.X1 + e.X2) / 2
+		e.LabelY = (e.Y1 + e.Y2) / 2
 		d.Edges = append(d.Edges, e)
 	}
 
@@ -214,6 +221,34 @@ func layout(g *graph.Graph) diagram {
 		}
 	}
 	return d
+}
+
+// wrapLabel splits a comma-joined category list into lines that each fit within
+// max characters, so the edge label stays inside the column gap instead of
+// overflowing a node. Both the SVG and raster renderers consume the lines; the
+// viewer wraps the same way in JS.
+func wrapLabel(s string, max int) []string {
+	if s == "" {
+		return nil
+	}
+	var lines []string
+	cur := ""
+	for _, p := range strings.Split(s, ", ") {
+		cand := p
+		if cur != "" {
+			cand = cur + ", " + p
+		}
+		if len([]rune(cand)) > max && cur != "" {
+			lines = append(lines, cur)
+			cur = p
+		} else {
+			cur = cand
+		}
+	}
+	if cur != "" {
+		lines = append(lines, cur)
+	}
+	return lines
 }
 
 func edgeLabel(f graph.Flow, labelOf map[string]string) string {

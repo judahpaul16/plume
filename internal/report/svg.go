@@ -22,11 +22,20 @@ func RenderSVG(g *graph.Graph) []byte {
 			e.X1, e.Y1, e.C1x, e.Y1, e.C2x, e.Y2, e.X2, e.Y2, e.Color)
 	}
 	for _, e := range d.Edges {
-		if e.Label == "" {
+		n := len(e.Lines)
+		if n == 0 {
 			continue
 		}
-		fmt.Fprintf(&b, `<text x="%.1f" y="%.1f" fill="#8aa0b8" font-size="10" text-anchor="middle">%s</text>`,
-			(e.X1+e.X2)/2, (e.Y1+e.Y2)/2-5, esc(e.Label))
+		fmt.Fprintf(&b, `<text x="%.1f" y="%.1f" fill="#8aa0b8" font-size="10" text-anchor="middle">`,
+			e.LabelX, e.LabelY-float64(n-1)*edgeLineH/2-1)
+		for i, line := range e.Lines {
+			if i == 0 {
+				fmt.Fprintf(&b, `<tspan x="%.1f">%s</tspan>`, e.LabelX, esc(line))
+			} else {
+				fmt.Fprintf(&b, `<tspan x="%.1f" dy="%.0f">%s</tspan>`, e.LabelX, edgeLineH, esc(line))
+			}
+		}
+		b.WriteString(`</text>`)
 	}
 
 	for _, n := range d.Nodes {

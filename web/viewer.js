@@ -20,6 +20,15 @@
   function catSens(id) { return (catById[id] || {}).sensitivity || "public"; }
   function flowSens(f) { var s = "public"; (f.categories || []).forEach(function (c) { if (rank(catSens(c)) > rank(s)) s = catSens(c); }); return s; }
   function catLabels(f) { return (f.categories || []).map(function (c) { return (catById[c] || {}).label || c; }); }
+  function wrapLabel(cats, max) {
+    var lines = [], cur = "";
+    cats.forEach(function (p) {
+      var cand = cur ? cur + ", " + p : p;
+      if (cand.length > max && cur) { lines.push(cur); cur = p; } else { cur = cand; }
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
 
   var out = {}, inc = {};
   data.nodes.forEach(function (n) { out[n.id] = []; inc[n.id] = []; });
@@ -78,7 +87,12 @@
     graphEdges.forEach(function (e) {
       var a = positions[e.from], b = positions[e.to]; if (!a || !b) return;
       e.path.setAttribute("d", edgeD(a, b));
-      if (e.label) { e.label.setAttribute("x", (a.x + a.w + b.x) / 2); e.label.setAttribute("y", (a.y + a.h / 2 + b.y + b.h / 2) / 2 - 5); }
+      if (e.label) {
+        var lx = (a.x + a.w + b.x) / 2, n = e.label.childNodes.length || 1;
+        e.label.setAttribute("x", lx);
+        e.label.setAttribute("y", (a.y + a.h / 2 + b.y + b.h / 2) / 2 - (n - 1) * 11 / 2 - 1);
+        for (var i = 0; i < e.label.childNodes.length; i++) e.label.childNodes[i].setAttribute("x", lx);
+      }
     });
   }
 
@@ -91,7 +105,15 @@
       var path = el("path", { fill: "none", stroke: css("--" + flowSens(f)), "stroke-width": 1.6, "marker-end": "url(#arrow)" });
       grp.appendChild(path);
       var labels = catLabels(f), lbl = null;
-      if (labels.length) { lbl = el("text", { "text-anchor": "middle" }); lbl.textContent = labels.join(", "); grp.appendChild(lbl); }
+      if (labels.length) {
+        lbl = el("text", { "text-anchor": "middle" });
+        wrapLabel(labels, 20).forEach(function (line, i) {
+          var ts = el("tspan"); ts.textContent = line;
+          if (i > 0) ts.setAttribute("dy", 11);
+          lbl.appendChild(ts);
+        });
+        grp.appendChild(lbl);
+      }
       grp.addEventListener("mousemove", function (ev) { showTip(ev, edgeTip(f)); });
       grp.addEventListener("mouseleave", hideTip);
       eLayer.appendChild(grp);
