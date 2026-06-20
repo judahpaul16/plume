@@ -21,6 +21,13 @@ func RenderSVG(g *graph.Graph) []byte {
 		fmt.Fprintf(&b, `<path d="M%.1f %.1f C%.1f %.1f %.1f %.1f %.1f %.1f" fill="none" stroke="%s" stroke-width="1.6" opacity="0.8"/>`,
 			e.X1, e.Y1, e.C1x, e.Y1, e.C2x, e.Y2, e.X2, e.Y2, e.Color)
 	}
+	for _, e := range d.Edges {
+		if e.Label == "" {
+			continue
+		}
+		fmt.Fprintf(&b, `<text x="%.1f" y="%.1f" fill="#8aa0b8" font-size="10" text-anchor="middle">%s</text>`,
+			(e.X1+e.X2)/2, (e.Y1+e.Y2)/2-5, esc(e.Label))
+	}
 
 	for _, n := range d.Nodes {
 		fmt.Fprintf(&b, `<rect x="%.1f" y="%.1f" width="%.0f" height="%.0f" rx="9" fill="#111826" stroke="%s" stroke-width="1.5"/>`,

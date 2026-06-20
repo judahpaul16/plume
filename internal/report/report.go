@@ -16,7 +16,9 @@ import (
 	"github.com/judahpaul16/plume/internal/graph"
 )
 
-// Render inlines the embedded viewer and the graph data into one HTML document.
+// Render inlines the viewer, the graph data, and the Go-computed node positions
+// into one self-contained HTML document, so the page and the CLI image share one
+// layout.
 func Render(webFS fs.FS, g *graph.Graph) ([]byte, error) {
 	idx, err := fs.ReadFile(webFS, "web/index.html")
 	if err != nil {
@@ -26,17 +28,29 @@ func Render(webFS fs.FS, g *graph.Graph) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	elkjs, err := fs.ReadFile(webFS, "web/elk.bundled.js")
-	if err != nil {
-		return nil, err
-	}
 	dataJSON, err := json.Marshal(g)
 	if err != nil {
 		return nil, err
 	}
+	type lnode struct {
+		X   float64 `json:"x"`
+		Y   float64 `json:"y"`
+		W   float64 `json:"w"`
+		H   float64 `json:"h"`
+		Sub string  `json:"sub"`
+	}
+	d := layout(g)
+	pos := make(map[string]lnode, len(d.Nodes))
+	for _, n := range d.Nodes {
+		pos[n.ID] = lnode{X: n.X, Y: n.Y, W: nodeW, H: nodeH, Sub: n.Kind}
+	}
+	layoutJSON, err := json.Marshal(pos)
+	if err != nil {
+		return nil, err
+	}
 	out := string(idx)
-	out = strings.Replace(out, "/*__PLUME_ELK__*/", string(elkjs), 1)
 	out = strings.Replace(out, "/*__PLUME_DATA__*/", string(dataJSON), 1)
+	out = strings.Replace(out, "/*__PLUME_LAYOUT__*/", string(layoutJSON), 1)
 	out = strings.Replace(out, "/*__PLUME_VIEWER__*/", string(viewer), 1)
 	return []byte(out), nil
 }

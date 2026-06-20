@@ -4,13 +4,13 @@
 
 **One command. A readable map of how user information flows through any codebase or infrastructure: where personal data enters, where it is stored, where it is sent, and where it leaks.**
 
-<img src="screenshots/demo.gif" alt="Plume demo" width="100%">
-
 [![CI](https://img.shields.io/github/actions/workflow/status/judahpaul16/plume/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/judahpaul16/plume/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/judahpaul16/plume?style=flat-square&label=release)](https://github.com/judahpaul16/plume/releases)
 [![Go](https://img.shields.io/github/go-mod/go-version/judahpaul16/plume?style=flat-square)](go.mod)
-[![Go Report Card](https://goreportcard.com/badge/github.com/judahpaul16/plume?style=flat-square)](https://goreportcard.com/report/github.com/judahpaul16/plume)
+[![Go Report Card](https://goreportcard.com/badge/github.com/judahpaul16/plume)](https://goreportcard.com/report/github.com/judahpaul16/plume)
 [![License: MIT](https://img.shields.io/github/license/judahpaul16/plume?style=flat-square)](LICENSE)
+
+<img src="screenshots/demo.gif" alt="Plume demo" width="100%">
 
 </div>
 

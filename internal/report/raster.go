@@ -37,7 +37,7 @@ func RenderRaster(g *graph.Graph, format string) ([]byte, error) {
 	face := func(f *truetype.Font, size float64) font.Face {
 		return truetype.NewFace(f, &truetype.Options{Size: size})
 	}
-	title, label, tag, small, legend := face(bold, 18), face(reg, 12.5), face(reg, 9.5), face(reg, 12), face(reg, 11)
+	title, label, tag, small, legend, elabel := face(bold, 18), face(reg, 12.5), face(reg, 9.5), face(reg, 12), face(reg, 11), face(reg, 10)
 
 	dc.SetFontFace(title)
 	dc.SetHexColor("#e5edf7")
@@ -52,6 +52,14 @@ func RenderRaster(g *graph.Graph, format string) ([]byte, error) {
 		dc.SetHexColor(e.Color + "cc")
 		dc.SetLineWidth(1.6)
 		dc.Stroke()
+	}
+	dc.SetFontFace(elabel)
+	dc.SetHexColor("#8aa0b8")
+	for _, e := range d.Edges {
+		if e.Label == "" {
+			continue
+		}
+		dc.DrawStringAnchored(e.Label, (e.X1+e.X2)/2, (e.Y1+e.Y2)/2-5, 0.5, 0.5)
 	}
 
 	for _, n := range d.Nodes {

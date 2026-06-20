@@ -1,8 +1,8 @@
 (function () {
   "use strict";
   var data = window.PLUME_DATA || { nodes: [], flows: [], categories: [] };
-  var elk = new ELK();
   var NS = "http://www.w3.org/2000/svg";
+  var LAYOUT = window.PLUME_LAYOUT || {};
 
   var nodeById = {}, catById = {};
   data.nodes.forEach(function (n) { nodeById[n.id] = n; });
@@ -52,9 +52,7 @@
   marker.appendChild(el("path", { d: "M0 0L10 5L0 10z", fill: "#5b7390" }));
   defs.appendChild(marker); svg.insertBefore(defs, root);
 
-  function nodeW(n) { var len = (n.label || n.id).length; return Math.max(104, Math.min(248, 24 + len * 8)); }
-
-  // ---------- graph view: ELK positions + cubic edges + draggable nodes ----------
+  // ---------- graph view: Go-computed positions + cubic edges + draggable nodes ----------
   var positions = {}, nodeEls = {}, graphEdges = [];
 
   function renderGraph() {
@@ -63,20 +61,11 @@
     var nodes = data.nodes.filter(function (n) { return used[n.id]; });
     emptyEl.style.display = flows.length ? "none" : "flex";
     if (!flows.length) { root.innerHTML = ""; return; }
-    var g = {
-      id: "root",
-      layoutOptions: {
-        "elk.algorithm": "layered", "elk.direction": "RIGHT",
-        "elk.layered.spacing.nodeNodeBetweenLayers": "110", "elk.spacing.nodeNode": "28"
-      },
-      children: nodes.map(function (n) { return { id: n.id, width: nodeW(n), height: 46 }; }),
-      edges: flows.map(function (f, i) { return { id: "e" + i, sources: [f.from], targets: [f.to] }; })
-    };
-    elk.layout(g).then(function (res) {
-      positions = {};
-      (res.children || []).forEach(function (c) { positions[c.id] = { x: c.x, y: c.y, w: c.width, h: c.height }; });
-      drawGraph(nodes, flows);
-    }).catch(function (err) { console.error("ELK", err); });
+    positions = {};
+    nodes.forEach(function (n) {
+      var p = LAYOUT[n.id]; if (p) positions[n.id] = { x: p.x, y: p.y, w: p.w, h: p.h };
+    });
+    drawGraph(nodes, flows);
   }
 
   function edgeD(a, b) {
@@ -114,8 +103,9 @@
       var grp = el("g", { "class": "node", "data-id": n.id });
       grp.style.cursor = "grab";
       grp.appendChild(el("rect", { width: p.w, height: p.h, rx: 9, fill: (KIND[n.kind] || {}).fill || "#16202e", stroke: kindColor(n.kind), "stroke-width": 1.5 }));
-      var label = el("text", { x: 12, y: 20 }); label.textContent = n.label || n.id; grp.appendChild(label);
-      var meta = el("text", { x: 12, y: 36, "class": "meta" }); meta.textContent = (KIND[n.kind] || {}).label || n.kind; grp.appendChild(meta);
+      var fl = n.label || n.id, mx = Math.floor((p.w - 20) / 7);
+      var label = el("text", { x: 12, y: 20 }); label.textContent = fl.length > mx ? fl.slice(0, mx - 1) + "…" : fl; grp.appendChild(label);
+      var meta = el("text", { x: 12, y: 36, "class": "meta" }); meta.textContent = (LAYOUT[n.id] || {}).sub || ((KIND[n.kind] || {}).label || n.kind); grp.appendChild(meta);
       grp.addEventListener("mousedown", function (ev) { startNodeDrag(ev, n.id); });
       grp.addEventListener("click", function (ev) { if (!draggedMoved) { ev.stopPropagation(); setFocus(focusOnly === n.id ? null : n.id); } });
       grp.addEventListener("mousemove", function (ev) { if (!nodeDrag) showTip(ev, nodeTip(n)); });

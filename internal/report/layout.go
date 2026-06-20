@@ -3,6 +3,8 @@ package report
 import (
 	"fmt"
 	"math"
+	"sort"
+	"strings"
 
 	"github.com/judahpaul16/plume/internal/graph"
 )
@@ -54,13 +56,14 @@ const (
 )
 
 type placedNode struct {
+	ID                  string
 	X, Y                float64
 	Label, Kind, Stroke string
 }
 
 type placedEdge struct {
+	From, To, Color, Label   string
 	X1, Y1, C1x, C2x, X2, Y2 float64
-	Color                    string
 }
 
 type legendItem struct{ Color, Label string }
@@ -73,23 +76,80 @@ type diagram struct {
 	Legend   []legendItem
 }
 
-// layout places the graph in kind-ordered columns (source to service to
-// store/sink/external) and computes edge curves. Both the SVG and raster
-// renderers consume the result so the two outputs always agree.
+// layout places each node in a column by its longest-path depth from a source,
+// orders layers by predecessor barycenter to cut crossings, and computes edge
+// curves. Both the SVG and raster renderers consume the result.
 func layout(g *graph.Graph) diagram {
-	order := []graph.Kind{graph.Source, graph.Service, graph.Store, graph.Sink, graph.External}
-	byKind := map[graph.Kind][]graph.Node{}
+	labelCount := map[string]int{}
 	for _, n := range g.Nodes {
-		byKind[n.Kind] = append(byKind[n.Kind], n)
+		labelCount[n.Label]++
 	}
-	var cols []graph.Kind
-	maxRows := 0
-	for _, k := range order {
-		if len(byKind[k]) > 0 {
-			cols = append(cols, k)
-			if len(byKind[k]) > maxRows {
-				maxRows = len(byKind[k])
+
+	preds := map[string][]string{}
+	for _, f := range g.Flows {
+		preds[f.To] = append(preds[f.To], f.From)
+	}
+	memo := map[string]int{}
+	inProg := map[string]bool{}
+	var depth func(id string) int
+	depth = func(id string) int {
+		if v, ok := memo[id]; ok {
+			return v
+		}
+		if inProg[id] {
+			return 0
+		}
+		inProg[id] = true
+		best := 0
+		for _, p := range preds[id] {
+			if l := depth(p) + 1; l > best {
+				best = l
 			}
+		}
+		inProg[id] = false
+		memo[id] = best
+		return best
+	}
+	byLayer := map[int][]graph.Node{}
+	maxLayer := 0
+	for _, n := range g.Nodes {
+		l := depth(n.ID)
+		byLayer[l] = append(byLayer[l], n)
+		if l > maxLayer {
+			maxLayer = l
+		}
+	}
+
+	idxInLayer := map[string]int{}
+	for l := 0; l <= maxLayer; l++ {
+		for i, n := range byLayer[l] {
+			idxInLayer[n.ID] = i
+		}
+	}
+	for l := 1; l <= maxLayer; l++ {
+		bary := map[string]float64{}
+		for _, n := range byLayer[l] {
+			sum, cnt := 0.0, 0
+			for _, p := range preds[n.ID] {
+				sum += float64(idxInLayer[p])
+				cnt++
+			}
+			if cnt > 0 {
+				bary[n.ID] = sum / float64(cnt)
+			} else {
+				bary[n.ID] = float64(idxInLayer[n.ID])
+			}
+		}
+		sort.SliceStable(byLayer[l], func(i, j int) bool { return bary[byLayer[l][i].ID] < bary[byLayer[l][j].ID] })
+		for i, n := range byLayer[l] {
+			idxInLayer[n.ID] = i
+		}
+	}
+
+	maxRows := 0
+	for l := 0; l <= maxLayer; l++ {
+		if len(byLayer[l]) > maxRows {
+			maxRows = len(byLayer[l])
 		}
 	}
 
@@ -99,9 +159,9 @@ func layout(g *graph.Graph) diagram {
 	rowStride := nodeH + rowGap
 
 	var d diagram
-	for ci, k := range cols {
-		ns := byKind[k]
-		x := svgPad + float64(ci)*colStride
+	for l := 0; l <= maxLayer; l++ {
+		ns := byLayer[l]
+		x := svgPad + float64(l)*colStride
 		colTop := contentTop + float64(maxRows-len(ns))*rowStride/2
 		for ri, n := range ns {
 			y := colTop + float64(ri)*rowStride
@@ -111,17 +171,20 @@ func layout(g *graph.Graph) diagram {
 				stroke = "#1f2a3a"
 			}
 			d.Nodes = append(d.Nodes, placedNode{
-				X: x, Y: y, Stroke: stroke, Kind: string(n.Kind),
+				ID: n.ID, X: x, Y: y, Stroke: stroke, Kind: nodeSub(n, labelCount[n.Label] > 1),
 				Label: truncate(n.Label, int(math.Floor((nodeW-20)/7))),
 			})
 		}
 	}
-	d.W = svgPad*2 + float64(len(cols))*nodeW + float64(maxi(len(cols)-1, 0))*colGap
+	numCols := maxLayer + 1
+	d.W = svgPad*2 + float64(numCols)*nodeW + float64(maxi(numCols-1, 0))*colGap
 	d.H = contentTop + float64(maxi(maxRows, 1))*rowStride - rowGap + svgPad + legendH
 
 	sevOf := map[string]graph.Sensitivity{}
+	labelOf := map[string]string{}
 	for _, c := range g.Categories {
 		sevOf[c.ID] = c.Sensitivity
+		labelOf[c.ID] = c.Label
 	}
 	for _, f := range g.Flows {
 		a, ok1 := topLeft[f.From]
@@ -130,7 +193,7 @@ func layout(g *graph.Graph) diagram {
 			continue
 		}
 		dx := math.Max(40, math.Abs(t.x-a.x)*0.35)
-		e := placedEdge{Y1: a.y + nodeH/2, Y2: t.y + nodeH/2, Color: edgeColor(f, sevOf)}
+		e := placedEdge{From: f.From, To: f.To, Label: edgeLabel(f, labelOf), Y1: a.y + nodeH/2, Y2: t.y + nodeH/2, Color: edgeColor(f, sevOf)}
 		if t.x < a.x {
 			e.X1, e.C1x = a.x, a.x-dx
 			e.X2, e.C2x = t.x+nodeW, t.x+nodeW+dx
@@ -151,6 +214,16 @@ func layout(g *graph.Graph) diagram {
 		}
 	}
 	return d
+}
+
+func edgeLabel(f graph.Flow, labelOf map[string]string) string {
+	parts := make([]string, 0, len(f.Categories))
+	for _, c := range f.Categories {
+		if l := labelOf[c]; l != "" {
+			parts = append(parts, l)
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 func edgeColor(f graph.Flow, sevOf map[string]graph.Sensitivity) string {
@@ -179,4 +252,23 @@ func maxi(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func nodeSub(n graph.Node, dup bool) string {
+	if dup && n.Location != "" {
+		dir := n.Location
+		if i := strings.LastIndex(dir, "/"); i >= 0 {
+			dir = dir[:i]
+		}
+		if n.System != "" && strings.HasPrefix(dir, n.System+"/") {
+			dir = dir[len(n.System)+1:]
+		}
+		if parts := strings.Split(dir, "/"); len(parts) > 2 {
+			dir = "…/" + strings.Join(parts[len(parts)-2:], "/")
+		}
+		if dir != "" {
+			return dir
+		}
+	}
+	return string(n.Kind)
 }
