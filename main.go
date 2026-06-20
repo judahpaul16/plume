@@ -32,6 +32,7 @@ flags:
   --out FILE     output file; .html is interactive, .svg is a static image (default plume.html)
   --no-open      write the report but do not serve or open a browser
   --blackbox     collapse code files into one Application node and hide file paths
+  --sankey       render the Sankey (flow-volume) view for .svg/.png/.jpg output
   --json         print the flow graph as JSON and exit
 `
 
@@ -54,6 +55,7 @@ func main() {
 	noOpen := flag.Bool("no-open", false, "write the report but do not serve or open a browser")
 	asJSON := flag.Bool("json", false, "print the flow graph as JSON and exit")
 	blackbox := flag.Bool("blackbox", false, "collapse code files into one Application node and hide file paths")
+	sankey := flag.Bool("sankey", false, "render the Sankey (flow-volume) view for image output")
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usageText) }
 	flag.Parse()
 
@@ -77,7 +79,7 @@ func main() {
 		return
 	}
 
-	data, err := renderTo(*out, g)
+	data, err := renderTo(*out, g, *sankey)
 	if err != nil {
 		fail(err)
 	}
@@ -94,15 +96,25 @@ func main() {
 }
 
 // renderTo renders an interactive HTML page, or a static image (.svg, .png,
-// .jpg) when the output name carries an image extension.
-func renderTo(out string, g *graph.Graph) ([]byte, error) {
+// .jpg) when the output name carries an image extension. With sankey, image
+// output is the flow-volume Sankey view.
+func renderTo(out string, g *graph.Graph, sankey bool) ([]byte, error) {
 	lo := strings.ToLower(out)
 	switch {
 	case strings.HasSuffix(lo, ".svg"):
+		if sankey {
+			return report.RenderSankeySVG(g), nil
+		}
 		return report.RenderSVG(g), nil
 	case strings.HasSuffix(lo, ".png"):
+		if sankey {
+			return report.RenderSankeyRaster(g, "png")
+		}
 		return report.RenderRaster(g, "png")
 	case strings.HasSuffix(lo, ".jpg"), strings.HasSuffix(lo, ".jpeg"):
+		if sankey {
+			return report.RenderSankeyRaster(g, "jpg")
+		}
 		return report.RenderRaster(g, "jpg")
 	default:
 		return report.Render(webFS, g)
