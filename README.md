@@ -91,23 +91,33 @@ Extraction is best-effort by nature; widen the dictionary and call patterns in
 
 ## Install
 
-Download a binary from [Releases](https://github.com/judahpaul16/plume/releases), or install
-from source with Go 1.22+ (`go install` is the `cargo install` equivalent):
+**macOS / Linux** — one line, no Go required:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/judahpaul16/plume/main/install.sh | sh
+```
+
+**Windows** — PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/judahpaul16/plume/main/install.ps1 | iex
+```
+
+**With Go** — any OS (`go install` is the `cargo install` equivalent):
 
 ```sh
 go install github.com/judahpaul16/plume@latest
-# or build a local checkout
-git clone https://github.com/judahpaul16/plume && cd plume && go build -o plume .
 ```
 
-`go install` drops the binary in `$(go env GOPATH)/bin` (usually `~/go/bin`). Add that to
-your `PATH` so the `plume` command is found:
+The script detects your OS and architecture and installs the latest static binary
+(`CGO_ENABLED=0`) to `/usr/local/bin`, falling back to `~/.local/bin`. `go install` puts it in
+`$(go env GOPATH)/bin`; add that to your `PATH`:
 
 ```sh
 export PATH="$PATH:$(go env GOPATH)/bin"   # add to ~/.bashrc or ~/.zshrc to persist
 ```
 
-The release binaries are fully static (`CGO_ENABLED=0`), one per OS/arch.
+Prebuilt binaries are also on the [Releases](https://github.com/judahpaul16/plume/releases) page.
 
 ## Usage
 
