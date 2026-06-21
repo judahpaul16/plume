@@ -68,18 +68,18 @@ func main() {
 	fmt.Fprintf(os.Stderr, "plume: %d files scanned (%d parsed, %d infra) across %d languages; %d nodes, %d flows\n",
 		st.Files, st.Parsed, st.Infra, len(st.Languages), len(g.Nodes), len(g.Flows))
 
-	if *blackbox {
-		g = graph.Collapse(g, graph.Service, "svc:app", "Application")
-	}
-
 	if *asJSON {
+		og := g
+		if *blackbox {
+			og = graph.Collapse(g, graph.Service, "svc:app", "Application")
+		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		_ = enc.Encode(g)
+		_ = enc.Encode(og)
 		return
 	}
 
-	data, err := renderTo(*out, g, *sankey)
+	data, err := renderTo(*out, g, *sankey, *blackbox)
 	if err != nil {
 		fail(err)
 	}
@@ -98,27 +98,37 @@ func main() {
 // renderTo renders an interactive HTML page, or a static image (.svg, .png,
 // .jpg) when the output name carries an image extension. With sankey, image
 // output is the flow-volume Sankey view.
-func renderTo(out string, g *graph.Graph, sankey bool) ([]byte, error) {
+func renderTo(out string, g *graph.Graph, sankey, blackbox bool) ([]byte, error) {
 	lo := strings.ToLower(out)
 	switch {
 	case strings.HasSuffix(lo, ".svg"):
+		gg := maybeCollapse(g, blackbox)
 		if sankey {
-			return report.RenderSankeySVG(g), nil
+			return report.RenderSankeySVG(gg), nil
 		}
-		return report.RenderSVG(g), nil
+		return report.RenderSVG(gg), nil
 	case strings.HasSuffix(lo, ".png"):
+		gg := maybeCollapse(g, blackbox)
 		if sankey {
-			return report.RenderSankeyRaster(g, "png")
+			return report.RenderSankeyRaster(gg, "png")
 		}
-		return report.RenderRaster(g, "png")
+		return report.RenderRaster(gg, "png")
 	case strings.HasSuffix(lo, ".jpg"), strings.HasSuffix(lo, ".jpeg"):
+		gg := maybeCollapse(g, blackbox)
 		if sankey {
-			return report.RenderSankeyRaster(g, "jpg")
+			return report.RenderSankeyRaster(gg, "jpg")
 		}
-		return report.RenderRaster(g, "jpg")
+		return report.RenderRaster(gg, "jpg")
 	default:
-		return report.Render(webFS, g)
+		return report.Render(webFS, g, blackbox)
 	}
+}
+
+func maybeCollapse(g *graph.Graph, blackbox bool) *graph.Graph {
+	if blackbox {
+		return graph.Collapse(g, graph.Service, "svc:app", "Application")
+	}
+	return g
 }
 
 // openReport serves and opens a saved report, or a picker gallery when given a

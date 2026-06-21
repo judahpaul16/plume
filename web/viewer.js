@@ -1,12 +1,29 @@
 (function () {
   "use strict";
-  var data = window.PLUME_DATA || { nodes: [], flows: [], categories: [] };
+  var DATA_FULL = window.PLUME_DATA || { nodes: [], flows: [], categories: [] };
+  var DATA_BB = window.PLUME_DATA_BB || DATA_FULL;
+  var LAYOUT_FULL = window.PLUME_LAYOUT || {};
+  var LAYOUT_BB = window.PLUME_LAYOUT_BB || LAYOUT_FULL;
+  var blackbox = !!window.PLUME_BLACKBOX;
   var NS = "http://www.w3.org/2000/svg";
-  var LAYOUT = window.PLUME_LAYOUT || {};
 
-  var nodeById = {}, catById = {};
-  data.nodes.forEach(function (n) { nodeById[n.id] = n; });
-  (data.categories || []).forEach(function (c) { catById[c.id] = c; });
+  var data, LAYOUT, nodeById, catById, out, inc;
+  function loadGraph() {
+    data = blackbox ? DATA_BB : DATA_FULL;
+    LAYOUT = blackbox ? LAYOUT_BB : LAYOUT_FULL;
+    nodeById = {};
+    catById = {};
+    data.nodes.forEach(function (n) { nodeById[n.id] = n; });
+    (data.categories || []).forEach(function (c) { catById[c.id] = c; });
+    out = {};
+    inc = {};
+    data.nodes.forEach(function (n) { out[n.id] = []; inc[n.id] = []; });
+    data.flows.forEach(function (f) {
+      (out[f.from] || (out[f.from] = [])).push(f.to);
+      (inc[f.to] || (inc[f.to] = [])).push(f.from);
+    });
+  }
+  loadGraph();
 
   var KIND = {
     source: { fill: "#06281f", label: "Source" }, service: { fill: "#0e2138", label: "Service" },
@@ -30,9 +47,6 @@
     return lines;
   }
 
-  var out = {}, inc = {};
-  data.nodes.forEach(function (n) { out[n.id] = []; inc[n.id] = []; });
-  data.flows.forEach(function (f) { (out[f.from] || (out[f.from] = [])).push(f.to); (inc[f.to] || (inc[f.to] = [])).push(f.from); });
   function lineage(id) {
     var set = {}; set[id] = true;
     (function up(x) { (inc[x] || []).forEach(function (p) { if (!set[p]) { set[p] = true; up(p); } }); })(id);
@@ -338,6 +352,18 @@
   var vg = document.getElementById("vGraph"), vs = document.getElementById("vSankey");
   vg.onclick = function () { viewMode = "graph"; vg.classList.add("on"); vs.classList.remove("on"); rerender(); };
   vs.onclick = function () { viewMode = "sankey"; vs.classList.add("on"); vg.classList.remove("on"); rerender(); };
+  var bbBtn = document.getElementById("blackbox");
+  if (bbBtn) {
+    bbBtn.classList.toggle("on", blackbox);
+    bbBtn.onclick = function () {
+      blackbox = !blackbox;
+      bbBtn.classList.toggle("on", blackbox);
+      loadGraph();
+      setFocus(null);
+      document.getElementById("counts").textContent = data.nodes.length + " nodes · " + data.flows.length + " flows";
+      rerender();
+    };
+  }
 
   buildFilters(); buildLegend(); rerender();
   window.addEventListener("resize", fit);

@@ -11,7 +11,9 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/judahpaul16/plume/internal/graph"
 )
@@ -19,7 +21,7 @@ import (
 // Render inlines the viewer, the graph data, and the Go-computed node positions
 // into one self-contained HTML document, so the page and the CLI image share one
 // layout.
-func Render(webFS fs.FS, g *graph.Graph) ([]byte, error) {
+func Render(webFS fs.FS, g *graph.Graph, blackbox bool) ([]byte, error) {
 	idx, err := fs.ReadFile(webFS, "web/index.html")
 	if err != nil {
 		return nil, err
@@ -28,9 +30,30 @@ func Render(webFS fs.FS, g *graph.Graph) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	dataJSON, err := json.Marshal(g)
+
+	fullData, fullLayout, err := embedGraph(g)
 	if err != nil {
 		return nil, err
+	}
+	bbData, bbLayout, err := embedGraph(graph.Collapse(g, graph.Service, "svc:app", "Application"))
+	if err != nil {
+		return nil, err
+	}
+
+	out := string(idx)
+	out = strings.Replace(out, "/*__PLUME_DATA__*/", fullData, 1)
+	out = strings.Replace(out, "/*__PLUME_LAYOUT__*/", fullLayout, 1)
+	out = strings.Replace(out, "/*__PLUME_DATA_BB__*/", bbData, 1)
+	out = strings.Replace(out, "/*__PLUME_LAYOUT_BB__*/", bbLayout, 1)
+	out = strings.Replace(out, "/*__PLUME_BLACKBOX__*/", strconv.FormatBool(blackbox), 1)
+	out = strings.Replace(out, "/*__PLUME_VIEWER__*/", string(viewer), 1)
+	return []byte(out), nil
+}
+
+func embedGraph(g *graph.Graph) (data string, positions string, err error) {
+	dataJSON, err := json.Marshal(g)
+	if err != nil {
+		return "", "", err
 	}
 	type lnode struct {
 		X   float64 `json:"x"`
@@ -46,13 +69,9 @@ func Render(webFS fs.FS, g *graph.Graph) ([]byte, error) {
 	}
 	layoutJSON, err := json.Marshal(pos)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
-	out := string(idx)
-	out = strings.Replace(out, "/*__PLUME_DATA__*/", string(dataJSON), 1)
-	out = strings.Replace(out, "/*__PLUME_LAYOUT__*/", string(layoutJSON), 1)
-	out = strings.Replace(out, "/*__PLUME_VIEWER__*/", string(viewer), 1)
-	return []byte(out), nil
+	return string(dataJSON), string(layoutJSON), nil
 }
 
 // Serve hosts the HTML on a loopback port, opens the browser, and blocks. It
@@ -72,7 +91,10 @@ func ServeContent(data []byte, contentType string) error {
 		w.Header().Set("Content-Type", contentType)
 		_, _ = w.Write(data)
 	})
-	go openBrowser(url)
+	go func() {
+		time.Sleep(250 * time.Millisecond)
+		openBrowser(url)
+	}()
 	fmt.Printf("Plume is viewing at %s  (press Ctrl+C to stop)\n", url)
 	return http.Serve(ln, mux)
 }
